@@ -1,7 +1,7 @@
 1- Clonar o projeto da main 
 2- Realizar o comando no terminal ''flutter pub get''
 3- Para testes será disponibilizado o email admin e a senha admin para acessar os dados
-email = admin & senha = admin
+email = erastogodi@outlook.com & senha = senhateste
 4- Caso deseje realizar uma nova entrada de dados é possível através do botão pular na tela de login 
 
 
