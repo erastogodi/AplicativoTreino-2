@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "828444205123",
+    "project_id": "fusionfitness-bf17d",
+    "storage_bucket": "fusionfitness-bf17d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:828444205123:android:b7c3d7e5d65ad9f5d234f6",
+        "android_client_info": {
+          "package_name": "com.example.treino_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAhXiM-iBzrLxpLyfzldroJRzscctGhvfU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
