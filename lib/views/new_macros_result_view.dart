@@ -1,10 +1,76 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:barcode_scan2/barcode_scan2.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../controllers/user_controller.dart';
 import '../controllers/water_controller.dart';
 
-class NewMacrosResultView extends StatelessWidget {
+class NewMacrosResultView extends StatefulWidget {
   const NewMacrosResultView({super.key});
+
+  @override
+  State<NewMacrosResultView> createState() => _NewMacrosResultViewState();
+}
+
+class _NewMacrosResultViewState extends State<NewMacrosResultView> {
+  String? _scannedResult;
+  Map<String, dynamic>? _nutritionData;
+
+  Future<void> scanBarcode() async {
+    try {
+      var result = await BarcodeScanner.scan();
+      if (result.rawContent.isNotEmpty) {
+        setState(() {
+          _scannedResult = result.rawContent;
+          _nutritionData = null;
+        });
+        await fetchNutritionData(result.rawContent);
+      } else {
+        setState(() {
+          _scannedResult = "Nenhum código escaneado.";
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _scannedResult = "Erro ao escanear: $e";
+      });
+    }
+  }
+
+  Future<void> fetchNutritionData(String barcode) async {
+    final url = 'https://world.openfoodfacts.org/api/v0/product/$barcode.json';
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 1) {
+          setState(() {
+            _nutritionData = data['product']['nutriments'];
+          });
+          openNutritionScreen(_nutritionData!);
+        } else {
+          throw "Produto não encontrado.";
+        }
+      } else {
+        throw "Erro na requisição: Código ${response.statusCode}";
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Erro ao buscar dados nutricionais: $e")),
+      );
+    }
+  }
+
+  void openNutritionScreen(Map<String, dynamic> nutritionData) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            NutritionDetailsScreen(nutritionData: nutritionData),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,14 +137,18 @@ class NewMacrosResultView extends StatelessWidget {
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
-                  child: macros == null
-                      ? const Center(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (macros == null)
+                        const Center(
                           child: Text(
                             'Erro ao calcular macros. Verifique seus dados!',
                             style: TextStyle(color: Colors.white),
                           ),
                         )
-                      : Column(
+                      else
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             _buildWaterIntake(waterController, waterIntakeGoal),
@@ -92,6 +162,26 @@ class NewMacrosResultView extends StatelessWidget {
                             }).toList(),
                           ],
                         ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: scanBarcode,
+                        icon: const Icon(Icons.qr_code_scanner),
+                        label: const Text("Escanear Código de Barras"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 16),
+                        ),
+                      ),
+                      if (_scannedResult != null) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          "Código Escaneado: $_scannedResult",
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -272,6 +362,92 @@ class NewMacrosResultView extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class NutritionDetailsScreen extends StatelessWidget {
+  final Map<String, dynamic> nutritionData;
+
+  const NutritionDetailsScreen({Key? key, required this.nutritionData})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Tabela Nutricional"),
+        backgroundColor: Colors.teal,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Informações Nutricionais",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView(
+                children: nutritionData.entries.map((entry) {
+                  String label = entry.key;
+                  String value = entry.value.toString();
+
+                  // Transformação para português e melhoria da exibição
+                  label = label.replaceAll('_', ' ').toUpperCase();
+                  label = label == 'ENERGY' ? 'Energia (kJ)' : label;
+                  label = label == 'PROTEINS' ? 'Proteínas' : label;
+                  label = label == 'FAT' ? 'Gorduras' : label;
+                  label = label == 'CARBOHYDRATES' ? 'Carboidratos' : label;
+                  label = label == 'SUGARS' ? 'Açúcares' : label;
+
+                  return Container(
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.shade300,
+                          blurRadius: 4,
+                          offset: const Offset(2, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          label,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.teal,
+                          ),
+                        ),
+                        Text(
+                          value,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
